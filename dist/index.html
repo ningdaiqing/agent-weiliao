@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agent微聊</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    font-size: 14px; color: #191919; background: #F5F5F5; user-select: none;
+  }
+  #app { display: flex; width: 100%; height: 100%; }
+
+  /* ============ 左侧窄栏（微信深灰工具条） ============ */
+  .navbar {
+    width: 64px; min-width: 64px; height: 100%; background: #2E2E2E;
+    display: flex; flex-direction: column; align-items: center; padding: 18px 0 14px 0;
+  }
+  .navbar .me-avatar {
+    width: 38px; height: 38px; border-radius: 5px; background: linear-gradient(135deg, #07C160, #10D070);
+    color: #fff; font-size: 17px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; margin-bottom: 22px; font-weight: 600;
+  }
+  .nav-item {
+    width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; cursor: pointer; margin-bottom: 12px; position: relative; color: #8F8F8F;
+    transition: color .12s;
+  }
+  .nav-item:hover { color: #d4d4d4; }
+  .nav-item.active { color: #07C160; }
+  .nav-item svg { width: 24px; height: 24px; }
+  .nav-item .badge {
+    position: absolute; top: 4px; right: 4px; background: #FA5151; color: #fff;
+    font-size: 10px; min-width: 16px; height: 16px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; padding: 0 4px;
+  }
+  .navbar .spacer { flex: 1; }
+
+  /* ============ 中间会话列表栏 ============ */
+  .sidebar {
+    width: 288px; min-width: 288px; height: 100%; background: #F7F7F7;
+    display: flex; flex-direction: column; border-right: 1px solid #E2E2E2;
+  }
+  .sidebar-header { padding: 16px 12px 10px 12px; display: flex; gap: 8px; align-items: center; }
+  .search-box {
+    flex: 1; height: 30px; background: #E2E2E2; border-radius: 5px; display: flex;
+    align-items: center; padding: 0 10px; gap: 6px; color: #999;
+  }
+  .search-box input {
+    flex: 1; border: none; outline: none; background: transparent; font-size: 12px; user-select: text;
+  }
+  .btn-plus {
+    width: 30px; height: 30px; border-radius: 5px; background: #E2E2E2; border: none; cursor: pointer;
+    font-size: 16px; color: #4C4C4C; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+  .btn-plus:hover { background: #D6D6D6; }
+
+  .conv-list { flex: 1; overflow-y: auto; padding: 0 8px; }
+  .conv-item {
+    display: flex; align-items: center; padding: 10px 10px; border-radius: 6px; cursor: pointer;
+    position: relative; margin-bottom: 1px;
+  }
+  .conv-item:hover { background: #DFDFDF; }
+  .conv-item.active { background: #C9C9C9; }
+  .conv-avatar {
+    width: 44px; height: 44px; border-radius: 5px; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; color: #fff; font-size: 17px; font-weight: 600;
+    overflow: hidden;
+  }
+  .conv-avatar.group { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 2px; gap: 1px; }
+  .conv-avatar.group .cell { border-radius: 2px; }
+  .conv-main { flex: 1; margin-left: 10px; overflow: hidden; }
+  .conv-row1 { display: flex; justify-content: space-between; align-items: center; }
+  .conv-name { font-size: 14px; color: #191919; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .conv-time { font-size: 11px; color: #B2B2B2; flex-shrink: 0; margin-left: 6px; }
+  .conv-row2 { display: flex; justify-content: space-between; align-items: center; margin-top: 3px; }
+  .conv-last { font-size: 12px; color: #999999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv-unread {
+    background: #FA5151; color: #fff; font-size: 10px; min-width: 16px; height: 16px;
+    border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 4px; flex-shrink: 0;
+  }
+  .conv-del {
+    display: none; position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 20px; height: 20px; border-radius: 4px; background: #FA5151; color: #fff;
+    font-size: 12px; align-items: center; justify-content: center; border: none; cursor: pointer;
+  }
+  .conv-item:hover .conv-del { display: flex; }
+  .conv-item:hover .conv-time { display: none; }
+
+  /* ============ 右侧聊天区 ============ */
+  .main { flex: 1; height: 100%; display: flex; flex-direction: column; min-width: 0; background: #F5F5F5; }
+  .chat-header {
+    height: 56px; min-height: 56px; background: #F5F5F5; border-bottom: 1px solid #E2E2E2;
+    display: flex; align-items: center; justify-content: center; position: relative;
+  }
+  .chat-title { font-size: 15px; font-weight: 500; }
+  .chat-sub { font-size: 11px; color: #B2B2B2; text-align: center; margin-top: 1px; }
+
+  .messages { flex: 1; overflow-y: auto; padding: 16px 28px 10px 28px; }
+  .time-divider { text-align: center; margin: 14px 0; font-size: 11px; color: #B2B2B2; }
+
+  .msg-row { display: flex; margin-bottom: 14px; align-items: flex-start; }
+  .msg-row.me { flex-direction: row-reverse; }
+  .msg-avatar {
+    width: 36px; height: 36px; border-radius: 4px; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 600;
+  }
+  .msg-body { max-width: 58%; margin: 0 10px; }
+  .msg-sender { font-size: 11px; color: #B2B2B2; margin-bottom: 3px; }
+  .msg-row.me .msg-sender { text-align: right; }
+  .bubble {
+    position: relative; padding: 9px 13px; border-radius: 6px; font-size: 14px; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word; user-select: text; text-align: left;
+  }
+  .bubble.them { background: #FFFFFF; }
+  .bubble.them::before {
+    content: ""; position: absolute; left: -5px; top: 13px; width: 0; height: 0;
+    border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-right: 6px solid #FFFFFF;
+  }
+  .bubble.mine { background: #95EC69; }
+  .bubble.mine::after {
+    content: ""; position: absolute; right: -5px; top: 13px; width: 0; height: 0;
+    border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid #95EC69;
+  }
+  .bubble.error { background: #FFF0F0; color: #C73737; font-size: 13px; }
+  .bubble.error::before { border-right-color: #FFF0F0; }
+  .typing-dots { display: inline-flex; gap: 4px; padding: 3px 2px; }
+  .typing-dots span {
+    width: 6px; height: 6px; border-radius: 50%; background: #B2B2B2; animation: blink 1.2s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: .2s; }
+  .typing-dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }
+
+  .input-area { background: #FFFFFF; border-top: 1px solid #E2E2E2; }
+  .input-toolbar {
+    height: 38px; display: flex; align-items: center; padding: 0 16px; gap: 14px; color: #7F7F7F;
+  }
+  .input-toolbar .tool { cursor: pointer; display: flex; align-items: center; }
+  .input-toolbar .tool svg { width: 19px; height: 19px; }
+  .input-wrap { padding: 0 16px 10px 16px; }
+  #inputBox {
+    width: 100%; height: 68px; border: none; outline: none; resize: none; font-size: 14px;
+    font-family: inherit; background: transparent; line-height: 1.5; user-select: text;
+  }
+  .input-actions { display: flex; justify-content: flex-end; align-items: center; padding: 0 16px 12px 16px; }
+  .send-btn {
+    padding: 6px 18px; border-radius: 4px; border: 1px solid #E2E2E2; background: #F0F0F0;
+    color: #B2B2B2; font-size: 13px; cursor: default;
+  }
+  .send-btn.ready { background: #07C160; border-color: #07C160; color: #fff; cursor: pointer; }
+  .send-btn.ready:hover { background: #06AD56; }
+  .hint { font-size: 11px; color: #B2B2B2; margin-right: 12px; }
+
+  .empty-chat {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #B2B2B2;
+  }
+  .empty-chat svg { width: 72px; height: 72px; margin-bottom: 14px; opacity: .5; }
+
+  /* ============ 通讯录（Agent 管理） ============ */
+  .contacts-view { flex: 1; height: 100%; background: #F5F5F5; display: flex; flex-direction: column; }
+  .contacts-body { flex: 1; overflow-y: auto; padding: 18px 24px; }
+  .contacts-title { font-size: 17px; font-weight: 600; margin-bottom: 14px; }
+  .section-label { font-size: 12px; color: #999; margin: 16px 0 8px 0; }
+  .agent-card {
+    background: #fff; border-radius: 8px; padding: 12px 14px; display: flex; align-items: center;
+    margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+  .agent-card .info { flex: 1; margin-left: 12px; min-width: 0; }
+  .agent-card .name { font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .agent-card .meta { font-size: 11px; color: #B2B2B2; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; flex-shrink: 0; }
+  .tag.ok { background: #E8F8EF; color: #07C160; }
+  .tag.no { background: #F0F0F0; color: #999; }
+  .tag.mock { background: #EDE7FF; color: #7C5CE0; }
+  .agent-actions { display: flex; gap: 6px; }
+  .mini-btn {
+    font-size: 12px; padding: 4px 10px; border-radius: 4px; border: 1px solid #E2E2E2;
+    background: #fff; cursor: pointer; color: #4C4C4C;
+  }
+  .mini-btn:hover { border-color: #07C160; color: #07C160; }
+  .mini-btn.primary { background: #07C160; border-color: #07C160; color: #fff; }
+  .mini-btn.danger:hover { border-color: #FA5151; color: #FA5151; }
+
+  /* ============ 弹窗 ============ */
+  .mask {
+    position: fixed; inset: 0; background: rgba(0,0,0,.25); display: flex;
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal {
+    background: #fff; border-radius: 10px; width: 420px; max-height: 78vh; display: flex;
+    flex-direction: column; box-shadow: 0 8px 30px rgba(0,0,0,.15); user-select: none;
+  }
+  .modal-head { padding: 18px 20px 0 20px; font-size: 16px; font-weight: 600; text-align: center; }
+  .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+  .modal-foot { padding: 12px 20px 18px 20px; display: flex; justify-content: flex-end; gap: 10px; }
+  .form-row { margin-bottom: 12px; }
+  .form-row label { display: block; font-size: 12px; color: #666; margin-bottom: 5px; }
+  .form-row input, .form-row select {
+    width: 100%; height: 34px; border: 1px solid #E2E2E2; border-radius: 5px; padding: 0 10px;
+    font-size: 13px; outline: none; font-family: inherit; user-select: text;
+  }
+  .form-row input:focus { border-color: #07C160; }
+  .select-item {
+    display: flex; align-items: center; padding: 9px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 4px;
+  }
+  .select-item:hover { background: #F5F5F5; }
+  .select-item .check {
+    width: 18px; height: 18px; border-radius: 50%; border: 2px solid #D6D6D6; margin-right: 10px;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; flex-shrink: 0;
+  }
+  .select-item.checked .check { background: #07C160; border-color: #07C160; }
+  .empty-note { text-align: center; color: #B2B2B2; font-size: 13px; padding: 24px 0; }
+
+  /* toast */
+  #toast {
+    position: fixed; top: 24px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75);
+    color: #fff; font-size: 13px; padding: 9px 18px; border-radius: 6px; z-index: 200;
+    display: none; max-width: 70%;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: #D6D6D6; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #C0C0C0; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<!-- 诊断信标：页面加载即触发（纯 HTML，不依赖 JS），用于证明 WebView2 确实加载了本页 -->
+<div id="app">
+
+  <!-- 左侧窄栏 -->
+  <div class="navbar">
+    <div class="me-avatar" title="主公">主</div>
+    <div class="nav-item active" id="navChat" title="聊天" onclick="switchView('chat')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      <span class="badge" id="navBadge" style="display:none">0</span>
+    </div>
+    <div class="nav-item" id="navContacts" title="Agent 管理" onclick="switchView('contacts')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div class="nav-item" title="发起新的聊天" onclick="openNewChatMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    </div>
+    <div class="spacer"></div>
+    <div class="nav-item" title="关于" onclick="toast('Agent微聊 v0.1.0 — 多 Agent 协作桌面端（Tauri）')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </div>
+  </div>
+
+  <!-- 中间栏：聊天列表 / Agent 管理 -->
+  <div class="sidebar" id="sidebarPanel"></div>
+
+  <!-- 右侧主区 -->
+  <div class="main" id="mainPanel"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ================= 状态 ================= */
+const LS_KEY = "agentweiliao_state_v1";
+const LS_OLD_KEY = "xxx_state_v1";
+let state = { agents: [], conversations: [], activeId: null, view: "chat" };
+let uid = 1;
+const nid = () => "id" + (uid++) + "_" + Date.now().toString(36);
+
+const KIND_META = {
+  claude: { name: "Claude Code", color: "#D97757", cmd: "claude" },
+  codex:  { name: "Codex CLI",    color: "#333333", cmd: "codex" },
+  gemini: { name: "Gemini CLI",   color: "#4285F4", cmd: "gemini" },
+  qwen:   { name: "Qwen Code",    color: "#6C5CE7", cmd: "qwen" },
+  mock:   { name: "Mock 助手",    color: "#07C160", cmd: "" },
+  custom: { name: "自定义",       color: "#0EA5B7", cmd: "" },
+};
+
+function save() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+}
+function load() {
+  try {
+    let raw = localStorage.getItem(LS_KEY);
+    if (!raw) { raw = localStorage.getItem(LS_OLD_KEY); if (raw) localStorage.setItem(LS_KEY, raw); }
+    const s = JSON.parse(raw);
+    if (s && Array.isArray(s.agents) && Array.isArray(s.conversations)) return s;
+  } catch (e) {}
+  return null;
+}
+
+/* ================= Tauri invoke ================= */
+function awIsTauri() { return !!((window.__TAURI__ && window.__TAURI__.core) || window.__TAURI_INTERNALS__); }
+// 双通道 invoke：__TAURI__ 全局缺失时退回 __TAURI_INTERNALS__（Tauri v2 的底层 IPC）
+function rawInvoke(cmd, args) {
+  if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) return window.__TAURI__.core.invoke(cmd, args);
+  if (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) return window.__TAURI_INTERNALS__.invoke(cmd, args);
+  return Promise.reject(new Error("no tauri bridge"));
+}
+async function tauriInvoke(cmd, args) {
+  return rawInvoke(cmd, args);
+}
+// 诊断日志：写到 %TEMP%\agentweiliao-debug.log
+function dlog(msg) {
+  try { console.log("[dlog]", msg); } catch (e) {}
+  try { rawInvoke("debug_log", { msg: String(msg) }).catch(function () {}); } catch (e) {}
+}
+
+/* ================= 工具 ================= */
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+function toast(msg, ms = 2600) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => { t.style.display = "none"; }, ms);
+}
+function fmtTime(ts) {
+  const d = new Date(ts), n = new Date();
+  const hm = d.toTimeString().slice(0, 5);
+  if (d.toDateString() === n.toDateString()) return hm;
+  const y = new Date(n); y.setDate(n.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return "昨天";
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+function fmtFull(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.toTimeString().slice(0, 5)}`;
+}
+function agentById(id) { return state.agents.find(a => a.id === id); }
+function activeConv() { return state.conversations.find(c => c.id === state.activeId); }
+
+function newAgent(name, kind, command) {
+  const a = { id: nid(), name, kind, command: command || (KIND_META[kind] || {}).cmd || "", installed: kind !== "mock" };
+  state.agents.push(a); return a;
+}
+function newConv(type, agentIds, name) {
+  const c = { id: nid(), type, agentIds: [...agentIds], name: name || null, messages: [], unread: 0, pending: [] };
+  state.conversations.unshift(c); return c;
+}
+function convTitle(c) {
+  if (c.type === "group") return c.name || (c.agentIds.map(id => (agentById(id) || {}).name || "?").join("、") + " 的群聊");
+  const a = agentById(c.agentIds[0]); return a ? a.name : "(已删除)";
+}
+
+/* ================= 初始化 ================= */
+function ensureShape(s) {
+  if (!s || typeof s !== "object") return null;
+  if (!Array.isArray(s.agents)) s.agents = [];
+  if (!Array.isArray(s.conversations)) s.conversations = [];
+  // 修复旧结构里缺失字段的会话
+  s.conversations = s.conversations.filter(c => c && typeof c === "object").map(c => {
+    if (!Array.isArray(c.messages)) c.messages = [];
+    if (!Array.isArray(c.pending)) c.pending = [];
+    if (!Array.isArray(c.agentIds)) c.agentIds = [];
+    if (typeof c.unread !== "number") c.unread = 0;
+    if (!c.type) c.type = c.agentIds.length > 1 ? "group" : "single";
+    return c;
+  }).filter(c => c.agentIds.length > 0);
+  // 修复消息里缺失字段的项
+  s.conversations.forEach(c => {
+    c.messages = c.messages.filter(m => m && typeof m === "object").map(m => {
+      if (!m.id) m.id = nid();
+      if (typeof m.ts !== "number") m.ts = Date.now();
+      if (typeof m.text !== "string") m.text = String(m.text == null ? "" : m.text);
+      if (!m.from) m.from = "sys";
+      return m;
+    });
+  });
+  if (!s.view) s.view = "chat";
+  if (s.activeId && !s.conversations.some(c => c.id === s.activeId)) s.activeId = null;
+  if (!s.activeId && s.conversations.length) s.activeId = s.conversations[0].id;
+  return s;
+}
+
+function fatal(msg) {
+  try {
+    const el = document.getElementById("sidebarPanel");
+    if (el) el.innerHTML = `<div style="padding:20px;font-size:12px;color:#C73737;line-height:1.8;user-select:text">
+      <b>初始化失败</b><br>${esc(msg)}<br><br>
+      <button onclick="localStorage.clear();location.reload()" style="padding:4px 10px;cursor:pointer">清空本地数据并重载</button>
+    </div>`;
+  } catch (e) {}
+}
+
+function bootstrap() {
+  dlog("=== bootstrap start === readyState=" + document.readyState + " awIsTauri=" + awIsTauri());
+  try {
+    document.title = "Agent微聊 · 启动中";
+    state = ensureShape(load()) || { agents: [], conversations: [], activeId: null, view: "chat" };
+    dlog("state loaded: agents=" + state.agents.length + " convs=" + state.conversations.length + " view=" + state.view);
+    seedIfEmpty();
+    dlog("after seed: agents=" + state.agents.length + " convs=" + state.conversations.length);
+    render();
+    dlog("render OK");
+    document.title = "Agent微聊";
+  } catch (e) {
+    dlog("BOOTSTRAP FAILED: " + (e && e.stack ? e.stack : e));
+    document.title = "Agent微聊 · 出错";
+    fatal(e && e.message ? e.message : String(e));
+    return;
+  }
+  // 渲染完成后，异步检测本地 CLI（失败不影响界面）
+  detectAndAdd();
+}
+
+function seedIfEmpty() {
+  if (state.agents.length > 0) return;
+  const m1 = newAgent("Claude Code（mock）", "mock", "");
+  const m2 = newAgent("Codex（mock）", "mock", "");
+  const m3 = newAgent("小航助手", "mock", "");
+  const c = newConv("single", [m3.id]);
+  c.messages.push({ id: nid(), from: m3.id, ts: Date.now(), text: "主公好，我是小航 👋\n\n这是一条 mock 欢迎消息：本机暂未检测到 claude / codex 等 CLI，所以我先替班。装好真实 CLI 后，点左侧「Agent 管理」→「重新检测」即可接入真实 agent。\n\n可以直接在下方输入框跟我聊天，或者点左上角 ＋ 拉一个群。" });
+  state.activeId = c.id;
+  if (awIsTauri()) {
+    const g = newConv("group", [m1.id, m2.id, m3.id], "AI 圆桌 · demo");
+    g.messages.push({ id: nid(), from: m3.id, ts: Date.now() - 60000, text: "群聊示例：在这里发一条消息，群里所有 agent 都会回复你（mock 模式即时回；真实 CLI 接入后为真实回复）。" });
+  }
+}
+
+async function detectAndAdd() {
+  if (!awIsTauri()) return;
+  let detected = [];
+  try { detected = await tauriInvoke("detect_agents"); } catch (e) { console.warn("detect failed", e); return; }
+  if (!Array.isArray(detected)) return;
+  const added = [];
+  for (const d of detected) {
+    if (d && d.installed && !state.agents.some(a => a.kind === d.kind)) {
+      const a = newAgent(d.display_name || d.kind, d.kind, d.command);
+      added.push(a.name);
+    }
+  }
+  if (added.length) {
+    try { render(); toast("检测到新 agent，已自动添加：" + added.join("、")); } catch (e) {}
+  }
+}
+
+/* ================= 视图切换 ================= */
+function switchView(v) {
+  state.view = v;
+  document.getElementById("navChat").classList.toggle("active", v === "chat");
+  document.getElementById("navContacts").classList.toggle("active", v === "contacts");
+  render();
+}
+
+/* ================= 渲染 ================= */
+function render() {
+  dlog("render(): view=" + state.view + " activeId=" + state.activeId);
+  renderSidebar();
+  dlog("renderSidebar done");
+  renderMain();
+  dlog("renderMain done");
+  save();
+}
+
+function renderSidebar() {
+  const el = document.getElementById("sidebarPanel");
+  if (state.view === "contacts") { el.innerHTML = contactsHTML(); bindContacts(); return; }
+  const convs = [...state.conversations].sort((a, b) => lastTs(b) - lastTs(a));
+  const items = convs.map(c => {
+    const last = c.messages.length ? c.messages[c.messages.length - 1] : null;
+    const lastText = c.pending.length ? "对方正在输入…" : last ? (last.from === "me" ? "我: " + preview(last.text) : last.from === "sys" ? preview(last.text) : (c.type === "group" ? ((agentById(last.from) || {name:"?"}).name + ": ") : "") + preview(last.text)) : "暂无消息";
+    const unread = c.unread && c.id !== state.activeId ? `<span class="conv-unread">${c.unread > 99 ? "99+" : c.unread}</span>` : "";
+    return `
+    <div class="conv-item ${c.id === state.activeId ? "active" : ""}" onclick="openConv('${c.id}')" title="${esc(convTitle(c))}">
+      ${avatarHTML(c, 44)}
+      <div class="conv-main">
+        <div class="conv-row1">
+          <span class="conv-name">${esc(convTitle(c))}</span>
+          <span class="conv-time">${last ? fmtTime(last.ts) : ""}</span>
+        </div>
+        <div class="conv-row2">
+          <span class="conv-last">${esc(lastText)}</span>${unread}
+        </div>
+      </div>
+      <button class="conv-del" title="删除会话" onclick="event.stopPropagation(); delConv('${c.id}')">✕</button>
+    </div>`;
+  }).join("");
+  const total = state.conversations.filter(c => c.id !== state.activeId).reduce((s, c) => s + c.unread, 0);
+  const badge = document.getElementById("navBadge");
+  badge.style.display = total ? "flex" : "none"; badge.textContent = total;
+  el.innerHTML = `
+    <div class="sidebar-header">
+      <div class="search-box">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="searchInput" placeholder="搜索" oninput="renderSearch(this.value)" />
+      </div>
+      <button class="btn-plus" title="发起新的聊天" onclick="openNewChatMenu()">＋</button>
+    </div>
+    <div class="conv-list" id="convList">${items || '<div class="empty-note">还没有会话<br>点右上角 ＋ 开始</div>'}</div>`;
+}
+function preview(t) { const s = String(t).replace(/\s+/g, " "); return s.length > 24 ? s.slice(0, 24) + "…" : s; }
+function lastTs(c) { return c.messages.length ? c.messages[c.messages.length - 1].ts : c.id ? 0 : 0; }
+
+function renderSearch(q) {
+  const list = document.getElementById("convList");
+  if (!list) return;
+  const convs = [...state.conversations].sort((a, b) => lastTs(b) - lastTs(a));
+  const items = convs.filter(c => !q || convTitle(c).toLowerCase().includes(q.toLowerCase())).map(c => {
+    const last = c.messages.length ? c.messages[c.messages.length - 1] : null;
+    return `
+    <div class="conv-item ${c.id === state.activeId ? "active" : ""}" onclick="openConv('${c.id}')">
+      ${avatarHTML(c, 44)}
+      <div class="conv-main">
+        <div class="conv-row1"><span class="conv-name">${esc(convTitle(c))}</span></div>
+        <div class="conv-row2"><span class="conv-last">${last ? esc(preview(last.text)) : "暂无消息"}</span></div>
+      </div>
+    </div>`;
+  }).join("");
+  list.innerHTML = items || '<div class="empty-note">无匹配会话</div>';
+}
+
+function avatarHTML(c, size) {
+  if (c.type === "group") {
+    const colors = c.agentIds.slice(0, 4).map(id => (agentById(id) || { color: "#999" }).color);
+    while (colors.length < 4) colors.push("#C9C9C9");
+    return `<div class="conv-avatar group" style="background:#fff">${colors.map(x => `<div class="cell" style="background:${x}"></div>`).join("")}</div>`;
+  }
+  const a = agentById(c.agentIds[0]) || { name: "?", color: "#999" };
+  const ch = a.name.trim().charAt(0).toUpperCase();
+  return `<div class="conv-avatar" style="background:${a.color}">${esc(ch)}</div>`;
+}
+
+/* ---- 主区 ---- */
+function renderMain() {
+  const el = document.getElementById("mainPanel");
+  if (state.view === "contacts") { el.innerHTML = `<div class="contacts-view" id="contactsDetail"></div>`; renderContactsDetail(); return; }
+  const c = activeConv();
+  if (!c) {
+    el.innerHTML = `<div class="empty-chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#B2B2B2" stroke-width="1"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div>选择一个会话，或点 ＋ 发起新聊天</div></div>`;
+    return;
+  }
+  const sub = c.type === "group"
+    ? `${c.agentIds.length} 位成员：${c.agentIds.map(id => (agentById(id) || {}).name || "?").join("、")}`
+    : kindLabel(c.agentIds[0]);
+  el.innerHTML = `
+    <div class="chat-header">
+      <div>
+        <div class="chat-title">${esc(convTitle(c))}</div>
+        <div class="chat-sub">${esc(sub)}</div>
+      </div>
+    </div>
+    <div class="messages" id="msgList">${messagesHTML(c)}</div>
+    <div class="input-area">
+      <div class="input-toolbar">
+        <span class="tool" title="表情（v1 占位）" onclick="insertEmoji()">😀</span>
+        <span class="tool" title="截图（v1 占位）" onclick="toast('v1 占位：文件/截图功能下一版接入')">📎</span>
+        <span class="tool" title="聊天记录（v1 占位）" onclick="toast('v1 占位')">🗂</span>
+      </div>
+      <div class="input-wrap">
+        <textarea id="inputBox" placeholder="" oninput="onInputChange()" onkeydown="onKey(event)"></textarea>
+      </div>
+      <div class="input-actions">
+        <span class="hint">Enter 发送 / Shift+Enter 换行</span>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">发送 (S)</button>
+      </div>
+    </div>`;
+  const box = document.getElementById("inputBox");
+  box.addEventListener("input", () => { autoGrow(box); onInputChange(); });
+  scrollBottom(false);
+}
+function kindLabel(agentId) {
+  const a = agentById(agentId); if (!a) return "";
+  const m = KIND_META[a.kind] || {};
+  return a.kind === "mock" ? "mock 模拟 · 本地" : a.kind === "custom" ? "自定义命令" : `${m.name || a.kind} · ${a.installed ? "已就绪" : "未检测到"}`;
+}
+function autoGrow(box) {
+  box.style.height = "68px";
+  const h = Math.min(box.scrollHeight, 140);
+  box.style.height = h + "px";
+}
+function onInputChange() {
+  const box = document.getElementById("inputBox");
+  const btn = document.getElementById("sendBtn");
+  if (!box || !btn) return;
+  const has = box.value.trim().length > 0;
+  btn.classList.toggle("ready", has);
+}
+function insertEmoji() { toast("表情面板下一版接入，先输入文字吧 😊"); }
+
+function messagesHTML(c) {
+  let html = "", lastTs = 0;
+  for (const m of c.messages) {
+    if (m.ts - lastTs > 5 * 60 * 1000) html += `<div class="time-divider">${fmtFull(m.ts)}</div>`;
+    lastTs = m.ts;
+    if (m.from === "sys") {
+      html += `<div class="time-divider">${esc(m.text)}</div>`;
+      continue;
+    }
+    if (m.from === "me") {
+      html += `<div class="msg-row me">
+        <div class="msg-avatar" style="background:linear-gradient(135deg,#07C160,#10D070)">主</div>
+        <div class="msg-body"><div class="msg-sender">主公</div><div class="bubble mine">${esc(m.text)}</div></div>
+      </div>`;
+    } else {
+      const a = agentById(m.from) || { name: "?", color: "#999" };
+      html += `<div class="msg-row">
+        <div class="msg-avatar" style="background:${a.color}">${esc(a.name.charAt(0).toUpperCase())}</div>
+        <div class="msg-body">${c.type === "group" ? `<div class="msg-sender">${esc(a.name)}</div>` : ""}
+          <div class="bubble ${m.error ? "error" : "them"}">${esc(m.text)}</div></div>
+      </div>`;
+    }
+  }
+  for (const pid of c.pending) {
+    const a = agentById(pid) || { name: "?", color: "#999" };
+    html += `<div class="msg-row">
+      <div class="msg-avatar" style="background:${a.color}">${esc(a.name.charAt(0).toUpperCase())}</div>
+      <div class="msg-body">${c.type === "group" ? `<div class="msg-sender">${esc(a.name)}</div>` : ""}
+        <div class="bubble them"><span class="typing-dots"><span></span><span></span><span></span></span></div></div>
+    </div>`;
+  }
+  return html || '<div class="empty-note" style="margin-top:40px">开始对话吧</div>';
+}
+function scrollBottom(smooth) {
+  const el = document.getElementById("msgList");
+  if (!el) return;
+  try {
+    if (typeof el.scrollTo === "function") {
+      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+  } catch (e) {
+    el.scrollTop = el.scrollHeight;
+  }
+}
+
+/* ================= 会话操作 ================= */
+function openConv(id) {
+  state.activeId = id;
+  const c = activeConv(); if (c) c.unread = 0;
+  switchView("chat");
+}
+function delConv(id) {
+  state.conversations = state.conversations.filter(c => c.id !== id);
+  if (state.activeId === id) state.activeId = state.conversations[0] ? state.conversations[0].id : null;
+  render();
+}
+
+function openNewChatMenu() {
+  if (!state.agents.length) { toast("请先到「Agent 管理」添加 agent"); switchView("contacts"); return; }
+  openModal(`
+    <div class="modal-head">发起聊天</div>
+    <div class="modal-body">
+      <div class="section-label" style="margin-top:0">选择联系人（单聊）</div>
+      ${state.agents.map(a => `
+        <div class="select-item" onclick="startSingle('${a.id}')">
+          ${avatarChip(a)}
+          <div style="flex:1"><div style="font-size:14px">${esc(a.name)}</div>
+          <div style="font-size:11px;color:#B2B2B2">${esc(kindLabel(a.id))}</div></div>
+        </div>`).join("")}
+      <div class="section-label">或</div>
+      <button class="mini-btn primary" style="width:100%;height:36px" onclick="openGroupModal()">发起群聊（多 Agent 圆桌）</button>
+    </div>`);
+}
+function avatarChip(a) {
+  return `<div class="msg-avatar" style="background:${a.color};width:36px;height:36px;margin-right:2px">${esc(a.name.trim().charAt(0).toUpperCase())}</div>`;
+}
+function startSingle(agentId) {
+  let c = state.conversations.find(x => x.type === "single" && x.agentIds[0] === agentId);
+  if (!c) c = newConv("single", [agentId]);
+  closeModal(); state.activeId = c.id; state.view = "chat"; render();
+}
+function openGroupModal() {
+  openModal(`
+    <div class="modal-head">发起群聊</div>
+    <div class="modal-body">
+      <div class="form-row"><label>群名称（可选）</label><input id="groupNameInput" placeholder="如：AI 圆桌" /></div>
+      <div class="form-row"><label>选择群成员（${state.agents.length} 个 agent）</label>
+        <div id="groupPickList">${state.agents.map(a => `
+          <div class="select-item" onclick="togglePick('${a.id}')">
+            <div class="check" id="chk_${a.id}">✓</div>
+            ${avatarChip(a)}
+            <div style="flex:1"><div style="font-size:14px">${esc(a.name)}</div>
+            <div style="font-size:11px;color:#B2B2B2">${esc(kindLabel(a.id))}</div></div>
+          </div>`).join("")}
+        </div>
+      </div>
+      <div style="font-size:11px;color:#999">群里发的消息会同时发给所有成员 agent，各自独立回复。</div>
+    </div>
+    <div class="modal-foot">
+      <button class="mini-btn" onclick="closeModal()">取消</button>
+      <button class="mini-btn primary" onclick="createGroup()">创建群聊</button>
+    </div>`);
+}
+let picked = {};
+function togglePick(id) {
+  picked[id] = !picked[id];
+  const chk = document.getElementById("chk_" + id);
+  const item = chk.parentElement;
+  chk.parentElement.classList.toggle("checked", picked[id]);
+}
+function createGroup() {
+  const ids = state.agents.filter(a => picked[a.id]).map(a => a.id);
+  if (!ids.length) { toast("请至少选择一个 agent"); return; }
+  const name = (document.getElementById("groupNameInput") || {}).value || "";
+  const c = newConv("group", ids, name || null);
+  c.messages.push({ id: nid(), from: "sys", ts: Date.now(), text: `群聊已创建，成员：${ids.map(id => agentById(id).name).join("、")}` });
+  picked = {}; closeModal();
+  state.activeId = c.id; state.view = "chat"; render();
+  toast("群聊已创建");
+}
+
+/* ================= 通讯录 / Agent 管理 ================= */
+function contactsHTML() {
+  return `
+    <div class="sidebar-header" style="justify-content:center"><b style="font-size:15px">Agent 管理</b></div>
+    <div class="conv-list" style="padding:8px">
+      <button class="mini-btn primary" style="width:100%;height:34px;margin-bottom:10px" onclick="redetect()">🔄 重新检测本地 Agent</button>
+      <button class="mini-btn" style="width:100%;height:34px" onclick="openAddAgentModal()">＋ 新建 Agent</button>
+      <div style="font-size:11px;color:#B2B2B2;margin-top:10px;padding:0 4px;line-height:1.6">
+        已检测的 CLI（claude / codex / gemini / qwen）会自动出现在右侧列表。mock 类型无需安装任何东西，可直接聊天。
+      </div>
+    </div>`;
+}
+function bindContacts() { /* 静态内容，无绑定 */ }
+
+function renderContactsDetail() {
+  const el = document.getElementById("contactsDetail");
+  if (!el) return;
+  const cards = state.agents.map(a => `
+    <div class="agent-card">
+      ${avatarChip(a)}
+      <div class="info">
+        <div class="name">${esc(a.name)}
+          ${a.kind === "mock" ? '<span class="tag mock">mock</span>' : a.installed ? '<span class="tag ok">已安装</span>' : '<span class="tag no">未检测到</span>'}
+        </div>
+        <div class="meta">${esc(agentMetaText(a))}</div>
+      </div>
+      <div class="agent-actions">
+        <button class="mini-btn" onclick="chatWith('${a.id}')">私聊</button>
+        <button class="mini-btn danger" onclick="delAgent('${a.id}')">删除</button>
+      </div>
+    </div>`).join("");
+  el.innerHTML = `
+    <div class="contacts-body">
+      <div class="contacts-title">我的 Agent（${state.agents.length}）</div>
+      ${cards || '<div class="empty-note">暂无 agent，点击左下「重新检测」或「新建 Agent」</div>'}
+    </div>`;
+}
+function agentMetaText(a) {
+  if (a.kind === "mock") return "本地模拟回复 · 无需 CLI";
+  if (a.kind === "custom") return `自定义命令: ${a.command || "(未设置)"} · 消息经 stdin 传入`;
+  const m = KIND_META[a.kind] || {};
+  return `${m.name || a.kind} · CLI: ${a.command} · 消息经 stdin 传入`;
+}
+function chatWith(agentId) { startSingle(agentId); }
+function delAgent(id) {
+  state.agents = state.agents.filter(a => a.id !== id);
+  state.conversations.forEach(c => c.agentIds = c.agentIds.filter(x => x !== id));
+  state.conversations = state.conversations.filter(c => c.agentIds.length > 0);
+  render(); toast("已删除");
+}
+async function redetect() {
+  if (!awIsTauri()) { toast("请在 Agent微聊 桌面端中使用检测功能"); return; }
+  toast("正在检测…");
+  let detected = [];
+  try { detected = await tauriInvoke("detect_agents"); } catch (e) { toast("检测失败: " + e); return; }
+  let added = 0;
+  for (const d of detected) {
+    if (d.installed) {
+      const exist = state.agents.find(a => a.kind === d.kind);
+      if (exist) { exist.installed = true; exist.command = d.command; }
+      else { newAgent(d.display_name, d.kind, d.command); added++; }
+    }
+  }
+  render();
+  toast(added ? `检测完成，新增 ${added} 个 agent` : "检测完成，没有发现新的 CLI");
+}
+function openAddAgentModal() {
+  openModal(`
+    <div class="modal-head">新建 Agent</div>
+    <div class="modal-body">
+      <div class="form-row"><label>名称</label><input id="naName" placeholder="如：我的军师" /></div>
+      <div class="form-row"><label>类型</label>
+        <select id="naKind" onchange="document.getElementById('naCmdWrap').style.display=this.value==='custom'?'block':'none'">
+          <option value="mock">mock（本地模拟，无需安装）</option>
+          <option value="claude">Claude Code（claude -p）</option>
+          <option value="codex">Codex CLI（codex exec）</option>
+          <option value="gemini">Gemini CLI（gemini）</option>
+          <option value="qwen">Qwen Code（qwen）</option>
+          <option value="custom">自定义命令（消息经 stdin 传入）</option>
+        </select>
+      </div>
+      <div class="form-row" id="naCmdWrap" style="display:none"><label>命令（如：aider --message）</label><input id="naCmd" placeholder="program arg1 arg2" /></div>
+      <div style="font-size:11px;color:#999;line-height:1.6">说明：claude/codex/gemini/qwen 需本机已安装对应 CLI 并完成登录；mock 无任何依赖。选择 claude/codex 等类型但本机未安装时，创建后也可正常聊天（将收到启动失败的错误提示）。</div>
+    </div>
+    <div class="modal-foot">
+      <button class="mini-btn" onclick="closeModal()">取消</button>
+      <button class="mini-btn primary" onclick="addAgentFromModal()">创建</button>
+    </div>`);
+}
+function addAgentFromModal() {
+  const name = document.getElementById("naName").value.trim();
+  const kind = document.getElementById("naKind").value;
+  const cmd = (document.getElementById("naCmd") || {}).value || "";
+  if (!name) { toast("请输入名称"); return; }
+  if (state.agents.some(a => a.name === name)) { toast("重名了，换一个名字"); return; }
+  const a = newAgent(name, kind, kind === "custom" ? cmd : "");
+  if (kind !== "mock" && kind !== "custom") a.command = (KIND_META[kind] || {}).cmd || kind;
+  closeModal(); render(); toast("已创建 " + a.name);
+}
+
+/* ================= 消息发送 ================= */
+function onKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+function buildPrompt(conv, text, selfAgent) {
+  const hist = conv.messages.filter(m => m.from !== "sys").slice(-10);
+  let p = "";
+  if (conv.type === "group") {
+    const others = conv.agentIds.map(id => agentById(id)).filter(Boolean);
+    const selfName = selfAgent ? selfAgent.name : "assistant";
+    p += `你正在参与一个多 Agent 群聊。你的名字是「${selfName}」。`;
+    p += `群成员：${others.map(a => a.name).join("、")}，以及一位人类用户（昵称"主公"）。\n`;
+    p += `请以「${selfName}」的身份，直接、专业地回答用户的问题，一两段话以内，不要复述问题，不要替其他 agent 回答。\n\n`;
+    if (hist.length) {
+      p += "[最近的聊天记录]\n";
+      for (const m of hist) {
+        p += m.from === "me" ? `用户: ${m.text}\n` : `${(agentById(m.from) || {name:"?"}).name}: ${m.text}\n`;
+      }
+      p += "\n";
+    }
+    p += `[用户的最新消息]\n${text}`;
+  } else {
+    if (hist.length) {
+      p += "[历史对话，仅供你理解上下文]\n";
+      for (const m of hist) {
+        p += m.from === "me" ? `用户: ${m.text}\n` : `助手: ${m.text}\n`;
+      }
+      p += "\n";
+    }
+    p += text;
+  }
+  return p;
+}
+async function sendMessage() {
+  const box = document.getElementById("inputBox");
+  const conv = activeConv();
+  if (!box || !conv || state.view !== "chat") return;
+  const text = box.value.trim();
+  if (!text) return;
+  box.value = ""; onInputChange(); autoGrow(box);
+  conv.messages.push({ id: nid(), from: "me", ts: Date.now(), text });
+  conv.pending = conv.agentIds.slice();
+  render(); scrollBottom(true);
+
+  const isGroup = conv.type === "group";
+  const jobs = conv.agentIds.map(async (aid) => {
+    const a = agentById(aid);
+    if (!a) return;
+    const prompt = buildPrompt(conv, text, a);
+    let reply, error = false;
+    if (awIsTauri()) {
+      try {
+        reply = await tauriInvoke("send_message", {
+          agentKind: a.kind, agentCommand: a.command || "", agentName: a.name,
+          prompt, timeoutSecs: 240,
+        });
+      } catch (e) { reply = "调用失败：" + String(e); error = true; }
+    } else {
+      reply = "（浏览器预览模式无法调用本地 CLI，请在 Agent微聊 桌面端中使用）";
+      error = true;
+    }
+    conv.pending = conv.pending.filter(x => x !== aid);
+    conv.messages.push({ id: nid(), from: aid, ts: Date.now(), text: reply, error });
+    if (state.activeId === conv.id) { render(); scrollBottom(true); } else { conv.unread++; render(); }
+  });
+  await Promise.allSettled(jobs);
+  conv.pending = [];
+  render();
+}
+
+/* ================= 弹窗 ================= */
+function openModal(inner) {
+  closeModal();
+  const mask = document.createElement("div");
+  mask.className = "mask"; mask.id = "modalMask";
+  mask.innerHTML = `<div class="modal">${inner}</div>`;
+  mask.addEventListener("click", e => { if (e.target === mask) closeModal(); });
+  document.body.appendChild(mask);
+}
+function closeModal() {
+  const m = document.getElementById("modalMask");
+  if (m) m.remove();
+}
+
+/* ================= 启动 ================= */
+window.__bootError = "none";
+window.addEventListener("error", (e) => {
+  window.__bootError = e.message + " @line " + e.lineno;
+  dlog("GLOBAL ERROR: " + e.message + " @ " + e.filename + ":" + e.lineno + ":" + e.colno);
+  fatal("脚本错误：" + e.message + "（行 " + e.lineno + "）");
+});
+window.addEventListener("unhandledrejection", (e) => {
+  window.__bootError = "rejection: " + (e.reason && e.reason.message ? e.reason.message : e.reason);
+  dlog("UNHANDLED REJECTION: " + (e.reason && e.reason.stack ? e.reason.stack : e.reason));
+});
+
+dlog("script parsed, readyState=" + document.readyState);
+
+try {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => { dlog("DOMContentLoaded fired"); bootstrap(); });
+  } else {
+    bootstrap();
+  }
+} catch (e) {
+  window.__bootError = "top-level: " + e.message;
+  dlog("TOP-LEVEL THROW: " + (e.stack || e));
+}
+</script>
+</body>
+</html>

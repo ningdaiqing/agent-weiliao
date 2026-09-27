@@ -1,0 +1,21 @@
+# 统一换行符：仓库内一律 LF，避免跨平台 diff 噪声
+* text=auto
+
+# Windows 专用文件强制 CRLF 检出（cmd 对 LF 结尾的 .bat 兼容性不佳）
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件不要做任何转换
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.exe binary
+*.dll binary
+*.lib binary
+*.pdb binary
+
+# 语言统计：前端是单文件 HTML，别让 GitHub 把它当纯 HTML 计数
+dist/index.html linguist-vendored=false

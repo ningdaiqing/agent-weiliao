@@ -1,0 +1,35 @@
+# ---------- Rust / Cargo ----------
+/target/
+**/target/
+target/
+
+# 注意：Cargo.lock **要**提交（本项目是二进制 crate，锁定依赖版本可保证可复现构建）
+
+# ---------- Tauri 自动生成 ----------
+/src-tauri/gen/schemas/
+src-tauri/gen/schemas/
+src-tauri/.cargo/
+
+# ---------- 构建/运行产物 ----------
+build-err.log
+*-start.log
+*.log
+
+# ---------- 操作系统 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ---------- 编辑器 / IDE ----------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ---------- 本地环境 ----------
+.env
+.env.local
+.env.*.local
